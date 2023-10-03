@@ -1,10 +1,33 @@
 const SHA256 = require("crypto-js/sha256");
+const EC = require("elliptic").ec;
+const ec = new EC("secp256k1");
 
 class Transaction {
   constructor(fromAddress, toAddress, amount) {
     this.fromAddress = fromAddress;
     this.toAddress = toAddress;
     this.amount = amount;
+  }
+
+  calculateHash() {
+    return SHA256(this.fromAddress + this.toAddress + this.amount).toString();
+  }
+  signTransaction(signingKey) {
+    if (signingKey.getPublic("hex") !== this.fromAddress) {
+      throw new Error("You cannot sign transactions for other wallets!");
+    }
+
+    const hashTx = this.calculateHash();
+    const sig = signingKey.sign(hashTx, "base64");
+    this.signature = sig.toDER("hex");
+  }
+  isValid() {
+    if (this.fromAddress === null) return true;
+    if (!this.signature || this.signature.length === 0) {
+      throw new Error("No signature in this transaction");
+    }
+    const publicKey = ec.keyFromPublic(this.fromAddress, "hex");
+    return publicKey.verify(this.calculateHash(), this.signature);
   }
 }
 
@@ -36,6 +59,8 @@ class Block {
     }
     console.log("Block Mined: " + this.hash);
   }
+
+  hasValidTransaction() {}
 }
 
 class Blockchain {
@@ -110,27 +135,5 @@ class Blockchain {
   }
 }
 
-let jsCoin = new Blockchain();
-jsCoin.createTransaction(new Transaction("address1", "address2", 100));
-jsCoin.createTransaction(new Transaction("address2", "address1", 100));
-
-console.log("\nStarting the miner...");
-jsCoin.minePendingTransactions("jays-address");
-
-console.log("\nBalance of Jay is ", jsCoin.getBalanceOfAddress("jays-address"));
-
-console.log("\nStarting the miner...");
-jsCoin.minePendingTransactions("jays-address");
-
-console.log("\nBalance of Jay is ", jsCoin.getBalanceOfAddress("jays-address"));
-
-// console.log("Mining Block 1... ");
-// jsCoin.addBlock(new Block(1, "9/11/2023", { amount: 1234 }));
-// console.log("Mining Block 2... ");
-// jsCoin.addBlock(new Block(2, "9/11/2023", { amount: 4321 }));
-
-// jsCoin.chain[1].data = { amount: 10000000000 };
-// jsCoin.chain[1].hash = jsCoin.chain[1].calculateHash();
-// console.log("Is Blockchain Valid? " + jsCoin.isChainValid());
-
-//console.log(JSON.stringify(jsCoin, null, 4));
+module.exports.Blockchain = Blockchain;
+module.exports.Transaction = Blockchain;
